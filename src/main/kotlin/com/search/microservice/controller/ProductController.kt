@@ -5,10 +5,7 @@ import com.search.microservice.dto.IndexProductRequest
 import com.search.microservice.repository.ProductElasticRepository
 import kotlinx.coroutines.withTimeout
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.*
 import reactor.util.Loggers
 
 
@@ -23,8 +20,18 @@ class ProductController(private val productElasticRepository: ProductElasticRepo
         ResponseEntity.ok(Product.of(request)).also { log.info("index product") }
     }
 
+    @GetMapping("/search")
+    suspend fun search(
+        @RequestParam(name = "term") term: String,
+        @RequestParam(name = "page", required = false, defaultValue = "0") page: Int,
+        @RequestParam(name = "size", required = false, defaultValue = "10") size: Int,
+    ) = withTimeout(timeoutMillis) {
+        val paginationResponse = productElasticRepository.search(term, page, size)
+        ResponseEntity.ok(paginationResponse).also { log.info("search term success: $term") }
+    }
+
     companion object {
         private val log = Loggers.getLogger(ProductController::class.java)
-        private const val timeoutMillis = 5000L
+        private const val timeoutMillis = 5555000L
     }
 }
