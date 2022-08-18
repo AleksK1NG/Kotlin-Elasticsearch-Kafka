@@ -1,0 +1,66 @@
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "autocomplete_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "name_synonym_filter",
+            "lowercase",
+            "remove_duplicates",
+            "ngram_filter"
+          ]
+        }
+      },
+      "filter": {
+        "ngram_filter": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 20
+        },
+        "name_synonym_filter" : {
+          "type": "synonym",
+          "synonyms": [
+            "Water, water, вода, Вода, Цфеук, цфеук, Djlf, djlf",
+            "Juice, juice, J7, сок, Сок, Огшсу, огшсу, Cjr, cjr",
+            "Apple, apple, яблоко, Яблоко, z,kjrj, Z,kjrj, Фззду, фззду",
+            "Orange, orange, Апельсинь, апельсин, Щкфтпу. щкфтпу, Fgtkmcby, fgtkmcby",
+            "Cheery, cherry, Вишня, вишня, Сруккн, сруккн, Dbiyf, dbiyz",
+            "Muffin, muffin, Маффин, маффин, cookies, Cookies, Ьгаашт, Ьгаашт, Vfaaby, vfaaby",
+            "Tomato, tomato, Помидор, помидор, Томат, томат, Ещьфещ, ещьфещ, Njvfn, njvfn",
+            "Chocolate, chocolate, Шоколад, шоколад, Срщсщдфеу, срщлщдфеу, Ijrjkfl, ijrjkfl"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer" : "standard"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer" : "standard"
+      },
+      "image_url": {
+        "type": "keyword"
+      },
+      "count_in_stock": {
+        "type": "long"
+      },
+      "shop": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer" : "standard"
+      },
+      "created_at": {
+        "type": "date"
+      }
+    }
+  }
+}
