@@ -17,10 +17,10 @@ import java.lang.Exception
 class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient): CommandLineRunner {
 
     @Value(value = "\${elasticsearch.mappings-path:classpath:mappings.json}")
-    val usersMappingsResourceFile: Resource? = null
+    val productsMappingsResourceFile: Resource? = null
 
     @Value(value = "\${elasticsearch.mappings-index-name}")
-    val usersIndexName: String? = null
+    val productIndexName: String? = null
 
     @Value(value = "\${faker.enable:false}")
     val enable: Boolean = false
@@ -31,19 +31,19 @@ class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient): 
 
     override fun run(vararg args: String?): Unit = runBlocking {
         try {
-            val mappingBytes = usersMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
-            log.info("creating index: $usersIndexName mappings: ${String(mappingBytes)}")
+            val mappingBytes = productsMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
+            log.info("creating index: $productIndexName mappings: ${String(mappingBytes)}")
 
-            val exists = esClient.indices().exists(ExistsRequest.Builder().index(usersIndexName).build()).await()
+            val exists = esClient.indices().exists(ExistsRequest.Builder().index(productIndexName).build()).await()
             if (!exists.value()) {
-                esClient.indices().create { it.index(usersIndexName).withJson(usersMappingsResourceFile?.inputStream) }.await()
+                esClient.indices().create { it.index(productIndexName).withJson(productsMappingsResourceFile?.inputStream) }.await()
                     .also { log.info("index created: ${it.index()}") }
 
 //                if (enable) generateMockData()
                 return@runBlocking
             }
 
-            esClient.indices().get(GetIndexRequest.Builder().index(usersIndexName).build()).await()
+            esClient.indices().get(GetIndexRequest.Builder().index(productIndexName).build()).await()
                 .also { log.info("index already exists: ${it.result()}") }
 
 //            if (enable) generateMockData()
