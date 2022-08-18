@@ -26,7 +26,6 @@ class ProductElasticRepositoryImpl(private val esClient: ElasticsearchAsyncClien
     }
 
     override suspend fun search(term: String, page: Int, size: Int): PaginationResponse<Product> = withTimeout(65000) {
-
         try {
             val response = esClient.search({
                 it.index(productIndexName)
