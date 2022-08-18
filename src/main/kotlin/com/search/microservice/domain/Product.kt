@@ -1,13 +1,10 @@
 package com.search.microservice.domain
 
-import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.search.microservice.dto.IndexProductRequest
 import java.time.Instant
-import java.time.LocalDateTime
-import java.util.Date
-import java.util.UUID
+import java.util.*
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
