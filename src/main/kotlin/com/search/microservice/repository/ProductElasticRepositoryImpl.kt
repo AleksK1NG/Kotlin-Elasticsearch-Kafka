@@ -1,6 +1,7 @@
 package com.search.microservice.repository
 
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
+import co.elastic.clients.json.JsonData
 import com.search.microservice.domain.Product
 import com.search.microservice.utils.PaginationResponse
 import kotlinx.coroutines.future.await
@@ -35,8 +36,11 @@ class ProductElasticRepositoryImpl(private val esClient: ElasticsearchAsyncClien
                         q.bool { b ->
                             b.should { s ->
                                 s.multiMatch { m ->
-                                    m.query(term)
-                                        .fields("title", "description", "shop")
+                                    m.query(term).fields("title", "description", "shop")
+                                }
+                            }.mustNot { s ->
+                                s.range { r ->
+                                    r.field("count_in_stock").lt(JsonData.of(0))
                                 }
                             }
                         }
