@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.elasticsearch.indices.ExistsRequest
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.search.microservice.utils.KeyboardLayoutManager
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Value
@@ -57,12 +58,20 @@ class ElasticSearchIndexConfig(
 
 
             val keyboardLayoutMappingsBytes = keyboardLayoutMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
-            val keyboardLayoutMap = objectMapper.readValue(keyboardLayoutMappingsBytes, Map::class.java)
-            log.info("leaded keyboard layout map: $keyboardLayoutMap")
+            val typeRef = HashMap<String, String>()::class.java
+//            val msg = objectMapper.readValue<Map<String, String>>(keyboardLayoutMappingsBytes, typeRef)
+            val msg2 = objectMapper.readValue(keyboardLayoutMappingsBytes, typeRef)
+//            log.info("leaded keyboard layout map: $keyboardLayoutMap")
+            log.info("mappings json: $msg2")
+            KeyboardLayoutManager(msg2)
 //            if (enable) generateMockData()
         } catch (ex: Exception) {
             log.error("error while loading mappings file: ${ex.message}", ex)
         }
+
+    }
+
+    public fun getOppositeLayoutSearchTerm(originalTerm: String) {
 
     }
 

@@ -3,6 +3,7 @@ package com.search.microservice.repository
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.json.JsonData
 import com.search.microservice.domain.Product
+import com.search.microservice.utils.KeyboardLayoutManager
 import com.search.microservice.utils.PaginationResponse
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeout
@@ -12,7 +13,10 @@ import reactor.util.Loggers
 
 
 @Repository
-class ProductElasticRepositoryImpl(private val esClient: ElasticsearchAsyncClient) : ProductElasticRepository {
+class ProductElasticRepositoryImpl(
+    private val esClient: ElasticsearchAsyncClient,
+    private val keyboardLayoutManager: KeyboardLayoutManager,
+) : ProductElasticRepository {
 
     @Value(value = "\${elasticsearch.mappings-index-name}")
     lateinit var productIndexName: String
@@ -37,6 +41,10 @@ class ProductElasticRepositoryImpl(private val esClient: ElasticsearchAsyncClien
                             b.should { s ->
                                 s.multiMatch { m ->
                                     m.query(term).fields("title", "description", "shop")
+                                }
+                            }.should { s ->
+                                s.multiMatch { m ->
+                                    m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields("title", "description", "shop")
                                 }
                             }.mustNot { s ->
                                 s.range { r ->
