@@ -3,6 +3,7 @@ package com.search.microservice.configuration
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.elasticsearch.indices.ExistsRequest
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Value
@@ -10,14 +11,19 @@ import org.springframework.boot.CommandLineRunner
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.Resource
 import reactor.util.Loggers
-import java.lang.Exception
 
 
 @Configuration
-class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient): CommandLineRunner {
+class ElasticSearchIndexConfig(
+    private val esClient: ElasticsearchAsyncClient,
+    private val objectMapper: ObjectMapper,
+) : CommandLineRunner {
 
     @Value(value = "\${elasticsearch.mappings-path:classpath:mappings.json}")
     val productsMappingsResourceFile: Resource? = null
+
+    @Value(value = "\${elasticsearch.keyboard-layout-mappings-path:classpath:translate.json}")
+    val keyboardLayoutMappingsResourceFile: Resource? = null
 
     @Value(value = "\${elasticsearch.mappings-index-name}")
     val productIndexName: String? = null
@@ -39,6 +45,9 @@ class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient): 
                 esClient.indices().create { it.index(productIndexName).withJson(productsMappingsResourceFile?.inputStream) }.await()
                     .also { log.info("index created: ${it.index()}") }
 
+                val keyboardLayoutMappingsBytes = keyboardLayoutMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
+                val keyboardLayoutMap = objectMapper.readValue(keyboardLayoutMappingsBytes, Map::class.java)
+                log.info("leaded keyboard layout map: $keyboardLayoutMap")
 //                if (enable) generateMockData()
                 return@runBlocking
             }
@@ -46,6 +55,10 @@ class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient): 
             esClient.indices().get(GetIndexRequest.Builder().index(productIndexName).build()).await()
                 .also { log.info("index already exists: ${it.result()}") }
 
+
+            val keyboardLayoutMappingsBytes = keyboardLayoutMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
+            val keyboardLayoutMap = objectMapper.readValue(keyboardLayoutMappingsBytes, Map::class.java)
+            log.info("leaded keyboard layout map: $keyboardLayoutMap")
 //            if (enable) generateMockData()
         } catch (ex: Exception) {
             log.error("error while loading mappings file: ${ex.message}", ex)

@@ -1,0 +1,37 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "multi_match": {
+            "query": "muf",
+            "fields": [
+              "title",
+              "description",
+              "shop"
+            ]
+          }
+        },
+        {
+          "multi_match": {
+            "query": "ьга",
+            "fields": [
+              "title",
+              "description",
+              "shop"
+            ]
+          }
+        }
+      ],
+      "must_not": [
+        {
+          "range": {
+            "count_in_stock": {
+              "lte": 10
+            }
+          }
+        }
+      ]
+    }
+  }
+}
