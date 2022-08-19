@@ -19,8 +19,8 @@ class KeyboardLayoutManagerConfig(private val objectMapper: ObjectMapper) {
     fun getKeyboardLayoutManager(): KeyboardLayoutManager {
         val keyboardLayoutMappingsBytes = keyboardLayoutMappingsResourceFile?.inputStream?.readAllBytes() ?: byteArrayOf()
         val typeRef = HashMap<String, String>()::class.java
-        val msg2 = objectMapper.readValue(keyboardLayoutMappingsBytes, typeRef)
-        return KeyboardLayoutManager(msg2).also { log.info("keyboard layout manager bean created: $msg2") }
+        val keyboardLayoutMappings = objectMapper.readValue(keyboardLayoutMappingsBytes, typeRef)
+        return KeyboardLayoutManager(keyboardLayoutMappings).also { log.info("keyboard layout manager bean created: $keyboardLayoutMappings") }
     }
 
     companion object {
