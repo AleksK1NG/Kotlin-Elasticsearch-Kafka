@@ -15,9 +15,9 @@ class ProductServiceImpl(
     private val publisher: KafkaPublisher,
     @Value(value = "\${microservice.kafka.topics.index-product:index-product}")
     private val indexProductTopicName: String,
-    ): ProductService {
+) : ProductService {
+
     override suspend fun index(product: Product) = coroutineScope {
-//        productElasticRepository.index(product)
         publisher.publish(indexProductTopicName, product)
     }
 
