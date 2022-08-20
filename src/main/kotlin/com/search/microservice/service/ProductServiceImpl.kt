@@ -17,7 +17,7 @@ class ProductServiceImpl(
     private val indexProductTopicName: String,
     ): ProductService {
     override suspend fun index(product: Product) = coroutineScope {
-        productElasticRepository.index(product)
+//        productElasticRepository.index(product)
         publisher.publish(indexProductTopicName, product)
     }
 
