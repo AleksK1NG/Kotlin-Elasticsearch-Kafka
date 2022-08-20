@@ -58,12 +58,9 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.handleBatchIndex")
 
         try {
-            if (semaphore.tryAcquire() && (batchQueue.size >= batchQueueSize)) {
-                productRepository.bulkInsert(batchQueue).also {
-                    batchQueue.clear()
-                    semaphore.release().also { log.info("batch insert semaphore released: ${Thread.currentThread().name}") }
-                }
-            }
+            semaphore.acquire()
+            if (batchQueue.size >= batchQueueSize)  productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
+            semaphore.release().also { log.info("batch insert semaphore released >>>>>>>>>>>>>>>>>>>>> \n: ${Thread.currentThread().name}") }
         } catch (ex: Exception) {
             semaphore.release().also { log.error("Scheduled handleBatchIndex error", ex) }.also { span.error(ex) }
             throw ex
@@ -73,18 +70,16 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     }
 
 
-    @Scheduled(initialDelay = 15000, fixedRate = 25000)
+    @Scheduled(initialDelay = 60000, fixedRate = 50000)
     fun flushBulkInsert() = runBlocking(errorhandler + tracer.asContextElement()) {
         withContext(Dispatchers.IO) {
+            log.info("running scheduled insert >>>>>>>>>, ${batchQueue} \n")
             val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBulkInsert")
 
             try {
-                if (semaphore.tryAcquire() && batchQueue.isNotEmpty()) {
-                    productRepository.bulkInsert(batchQueue).also {
-                        batchQueue.clear()
-                        semaphore.release().also { span.tag("bulkInsert count", batchQueue.size.toString()) }
-                    }
-                }
+                semaphore.acquire()
+                if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
+                semaphore.release().also { span.tag("bulkInsert count", batchQueue.size.toString()) }
             } catch (ex: Exception) {
                 semaphore.release().also { log.error("Scheduled flushBulkInsert error", ex) }.also { span.error(ex) }
                 throw ex
@@ -95,7 +90,7 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     }
 
     @PreDestroy
-    fun flushBatchQueue() = runBlocking(tracer.asContextElement()) {
+    fun flushBatchQueue() = runBlocking {
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBatchQueue")
 
         try {
