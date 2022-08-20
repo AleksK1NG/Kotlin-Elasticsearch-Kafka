@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import reactor.util.Loggers
 import java.util.concurrent.BlockingDeque
-import java.util.concurrent.LinkedBlockingDeque
 
 
 @Repository
@@ -36,9 +35,8 @@ class ProductElasticRepositoryImpl(
     }
 
     override suspend fun search(term: String, page: Int, size: Int): PaginationResponse<Product> = withTimeout(65000) {
-        LinkedBlockingDeque<Any>(100)
         try {
-            val response = esClient.search({
+            esClient.search({
                 it.index(productIndexName)
                     .size(size)
                     .from((page * size))
@@ -59,13 +57,11 @@ class ProductElasticRepositoryImpl(
                             }
                         }
                     }
-            }, Product::class.java).await()
-            log.info("search response: $response")
-
-            val productList = response.hits().hits().mapNotNull { it.source() }
-            val totalHits = response.hits().total()?.value() ?: 0
-
-            PaginationResponse.of(page, size, totalHits, productList).also { log.info("search result: $it") }
+            }, Product::class.java).await().let {
+                val productList = it.hits().hits().mapNotNull { hit -> hit.source() }
+                val totalHits = it.hits().total()?.value() ?: 0
+                PaginationResponse.of(page, size, totalHits, productList).also { log.info("search result: $it") }
+            }
         } catch (ex: Exception) {
             log.error("search error", ex)
             throw ex
@@ -74,9 +70,9 @@ class ProductElasticRepositoryImpl(
 
     override suspend fun bulkInsert(products: BlockingDeque<Product>) = withContext(Dispatchers.IO) {
         try {
-            val br = BulkRequest.Builder()
-
             if (products.isNotEmpty()) {
+                val br = BulkRequest.Builder().index(productIndexName)
+
                 products.forEach { product ->
                     br.operations {
                         it.index<Product> { indexOpsBuilder ->
@@ -85,11 +81,8 @@ class ProductElasticRepositoryImpl(
                     }
                 }
 
-                br.index(productIndexName)
                 val bulkRequest = br.build()
-                val response = esClient.bulk(bulkRequest).await()
-
-                log.info("bulk insert response: $response")
+                esClient.bulk(bulkRequest).await().also { log.info("bulk insert response: $it") }
             }
         } catch (ex: Exception) {
             log.error("bulkInsert", ex)
