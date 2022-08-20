@@ -4,6 +4,10 @@
 # Docker
 
 local:
+	@echo Clearing kafka data
+	rm -rf ./kafka_data
+	@echo Clearing zookeeper data
+	rm -rf ./zookeeper
 	@echo Clearing elasticserach data
 	rm -rf ./es-data01
 	@echo Clearing prometheus data
