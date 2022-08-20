@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service
 import reactor.util.Loggers
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.Semaphore
+import javax.annotation.PreDestroy
 
 
 @Service
@@ -25,7 +26,7 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     private val semaphore = Semaphore(1)
 
     @Value(value = "\${spring.kafka.consumer.batch-queue-size}")
-    private val batchQueueSize: Int = 100
+    private val batchQueueSize: Int = 500
 
     @KafkaListener(
         topics = ["\${microservice.kafka.topics.index-product}"], groupId = "\${microservice.kafka.groupId}", concurrency = "\${microservice.kafka.default-concurrency}"
@@ -47,11 +48,14 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
 
     private suspend fun handleBatchIndex() = withContext(Dispatchers.IO) {
         try {
-            semaphore.acquire().also { log.info("batch insert semaphore acquired: ${Thread.currentThread().name}") }
-            if (batchQueue.size >= batchQueueSize) productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
-            semaphore.release().also { log.info("batch insert semaphore released: ${Thread.currentThread().name}") }
+            if (semaphore.tryAcquire() && (batchQueue.size >= batchQueueSize)) {
+                productRepository.bulkInsert(batchQueue).also {
+                    batchQueue.clear()
+                    semaphore.release().also { log.info("batch insert semaphore released: ${Thread.currentThread().name}") }
+                }
+            }
         } catch (ex: Exception) {
-            semaphore.release()
+            semaphore.release().also { log.error("Scheduled handleBatchIndex error", ex) }
             throw ex
         }
     }
@@ -61,14 +65,29 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     private fun flushBulkInsert() = runBlocking(errorhandler) {
         withContext(Dispatchers.IO) {
             try {
-                semaphore.acquire()
-                if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
-                semaphore.release()
+                if (semaphore.tryAcquire() && batchQueue.isNotEmpty()) {
+                    productRepository.bulkInsert(batchQueue).also {
+                        batchQueue.clear()
+                        semaphore.release()
+                    }
+                }
             } catch (ex: Exception) {
-                log.error("Scheduled flushBulkInsert error", ex)
-                semaphore.release()
+                semaphore.release().also { log.error("Scheduled flushBulkInsert error", ex) }
                 throw ex
             }
+        }
+    }
+
+    @PreDestroy
+    fun flushBatchQueue() = runBlocking {
+        try {
+            if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
+                batchQueue.clear()
+                log.info("batch queue saved")
+            }
+        } catch (ex: Exception) {
+            log.error("flushBatchQueue", ex)
+            throw ex
         }
     }
 

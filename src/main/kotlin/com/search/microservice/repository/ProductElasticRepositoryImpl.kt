@@ -31,6 +31,7 @@ class ProductElasticRepositoryImpl(
                 .also { log.info("response: $it") }
         } catch (ex: Exception) {
             log.error("index error", ex)
+            throw ex
         }
     }
 
@@ -57,11 +58,13 @@ class ProductElasticRepositoryImpl(
                             }
                         }
                     }
-            }, Product::class.java).await().let {
-                val productList = it.hits().hits().mapNotNull { hit -> hit.source() }
-                val totalHits = it.hits().total()?.value() ?: 0
-                PaginationResponse.of(page, size, totalHits, productList).also { log.info("search result: $it") }
-            }
+            }, Product::class.java)
+                .await()
+                .let {
+                    val productList = it.hits().hits().mapNotNull { hit -> hit.source() }
+                    val totalHits = it.hits().total()?.value() ?: 0
+                    PaginationResponse.of(page, size, totalHits, productList).also { response -> log.info("search result: $response") }
+                }
         } catch (ex: Exception) {
             log.error("search error", ex)
             throw ex
@@ -81,8 +84,7 @@ class ProductElasticRepositoryImpl(
                     }
                 }
 
-                val bulkRequest = br.build()
-                esClient.bulk(bulkRequest).await().also { log.info("bulk insert response: $it") }
+                esClient.bulk(br.build()).await().also { log.info("bulk insert response: $it") }
             }
         } catch (ex: Exception) {
             log.error("bulkInsert", ex)
