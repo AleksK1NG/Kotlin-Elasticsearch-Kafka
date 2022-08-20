@@ -93,6 +93,14 @@ services:
       - '3005:3000'
     networks: [ "microservices" ]
 
+  zipkin:
+    image: openzipkin/zipkin:latest
+    restart: always
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks: [ "microservices" ]
+
 volumes:
   es-data01:
     driver: local

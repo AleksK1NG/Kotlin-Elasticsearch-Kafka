@@ -9,8 +9,9 @@ import com.search.microservice.utils.PaginationResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.cloud.sleuth.Tracer
+import org.springframework.cloud.sleuth.instrument.kotlin.asContextElement
 import org.springframework.stereotype.Repository
 import reactor.util.Loggers
 import java.util.concurrent.BlockingDeque
@@ -20,22 +21,33 @@ import java.util.concurrent.BlockingDeque
 class ProductElasticRepositoryImpl(
     private val esClient: ElasticsearchAsyncClient,
     private val keyboardLayoutManager: KeyboardLayoutManager,
+    private val tracer: Tracer
 ) : ProductElasticRepository {
 
     @Value(value = "\${elasticsearch.mappings-index-name}")
     lateinit var productIndexName: String
 
-    override suspend fun index(product: Product) {
+    override suspend fun index(product: Product): Unit = withContext(Dispatchers.IO + tracer.asContextElement()) {
+        val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.index")
+
         try {
-            esClient.index<Product> { it.index(productIndexName).id(product.id).document(product) }.await()
-                .also { log.info("response: $it") }
+            esClient.index<Product> { it.index(productIndexName).id(product.id).document(product) }
+                .await()
+                .also {
+                    span.tag("response", it.toString())
+                    log.info("response: $it")
+                }
         } catch (ex: Exception) {
-            log.error("index error", ex)
+            log.error("index error", ex).also { span.error(ex) }
             throw ex
+        } finally {
+            span.end()
         }
     }
 
-    override suspend fun search(term: String, page: Int, size: Int): PaginationResponse<Product> = withTimeout(65000) {
+    override suspend fun search(term: String, page: Int, size: Int): PaginationResponse<Product> = withContext(Dispatchers.IO + tracer.asContextElement()) {
+        val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.search")
+
         try {
             esClient.search({
                 it.index(productIndexName)
@@ -63,32 +75,41 @@ class ProductElasticRepositoryImpl(
                 .let {
                     val productList = it.hits().hits().mapNotNull { hit -> hit.source() }
                     val totalHits = it.hits().total()?.value() ?: 0
-                    PaginationResponse.of(page, size, totalHits, productList).also { response -> log.info("search result: $response") }
+                    PaginationResponse.of(page, size, totalHits, productList)
+                        .also { response -> log.info("search result: $response") }
+                        .also { response -> span.tag("search result", response.toString()) }
                 }
         } catch (ex: Exception) {
-            log.error("search error", ex)
+            log.error("search error", ex).also { span.error(ex) }
             throw ex
+        } finally {
+            span.end()
         }
     }
 
-    override suspend fun bulkInsert(products: BlockingDeque<Product>) = withContext(Dispatchers.IO) {
+    override suspend fun bulkInsert(products: BlockingDeque<Product>) = withContext(Dispatchers.IO + tracer.asContextElement()) {
+        val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.bulkInsert")
+
         try {
             if (products.isNotEmpty()) {
                 val br = BulkRequest.Builder().index(productIndexName)
 
                 products.forEach { product ->
                     br.operations {
-                        it.index<Product> { indexOpsBuilder ->
-                            indexOpsBuilder.document(product).id(product.id)
-                        }
+                        it.index<Product> { indexOpsBuilder -> indexOpsBuilder.document(product).id(product.id) }
                     }
                 }
 
-                esClient.bulk(br.build()).await().also { log.info("bulk insert response: $it") }
+                esClient.bulk(br.build()).await().also {
+                    span.tag("bulk insert response", it.toString())
+                    log.info("bulk insert response: $it")
+                }
             }
         } catch (ex: Exception) {
-            log.error("bulkInsert", ex)
+            log.error("bulkInsert", ex).also { span.error(ex) }
             throw ex
+        } finally {
+            span.end()
         }
     }
 

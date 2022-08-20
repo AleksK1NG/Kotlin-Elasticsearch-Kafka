@@ -3,12 +3,11 @@ package com.search.microservice.consumer
 import com.search.microservice.domain.Product
 import com.search.microservice.exceptions.SerializationException
 import com.search.microservice.repository.ProductElasticRepository
-import com.search.microservice.utils.SerializationUtils.deserializeFromJsonBytes
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import com.search.microservice.utils.SerializationUtils
+import kotlinx.coroutines.*
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.cloud.sleuth.Tracer
+import org.springframework.cloud.sleuth.instrument.kotlin.asContextElement
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.Acknowledgment
 import org.springframework.messaging.handler.annotation.Payload
@@ -21,7 +20,7 @@ import javax.annotation.PreDestroy
 
 
 @Service
-class ProductKafkaConsumer(private val productRepository: ProductElasticRepository) {
+class ProductKafkaConsumer(private val productRepository: ProductElasticRepository, private val tracer: Tracer) {
     private val batchQueue = LinkedBlockingDeque<Product>()
     private val semaphore = Semaphore(1)
 
@@ -32,21 +31,32 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
         topics = ["\${microservice.kafka.topics.index-product}"], groupId = "\${microservice.kafka.groupId}", concurrency = "\${microservice.kafka.default-concurrency}"
     )
     fun processIndexProduct(@Payload data: ByteArray, ack: Acknowledgment) = runBlocking {
-        try {
-            log.info("process kafka message: ${String(data)}")
-            val deserializedProduct = deserializeFromJsonBytes(data, Product::class.java)
-            log.info("process deserialized product: $deserializedProduct")
-            batchQueue.add(deserializedProduct)
-            if (batchQueue.size >= batchQueueSize) handleBatchIndex()
-            ack.acknowledge().also { log.info("<<<commit>>> batch insert message") }
-        } catch (ex: SerializationException) {
-            ack.acknowledge().also { log.error("<<<commit error>>> serialization exception", ex) }
-        } catch (ex: Exception) {
-            log.error("processIndexProduct Exception", ex)
+        withContext(tracer.asContextElement()) {
+            withTimeout(handleTimeoutMillis) {
+                val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.processIndexProduct")
+
+                try {
+                    val deserializedProduct = SerializationUtils.deserializeFromJsonBytes(data, Product::class.java)
+                    batchQueue.add(deserializedProduct).also { log.info("process deserialized product: $deserializedProduct") }
+                    if (batchQueue.size >= batchQueueSize) handleBatchIndex()
+                    ack.acknowledge().also {
+                        log.info("<<<commit>>> batch insert message")
+                        span.tag("message", deserializedProduct.toString())
+                    }
+                } catch (ex: SerializationException) {
+                    ack.acknowledge().also { log.error("<<<commit error>>> serialization ex ception", ex) }.also { span.error(ex) }
+                } catch (ex: Exception) {
+                    log.error("processIndexProduct Exception", ex).also { span.error(ex) }
+                } finally {
+                    span.end()
+                }
+            }
         }
     }
 
-    private suspend fun handleBatchIndex() = withContext(Dispatchers.IO) {
+    private suspend fun handleBatchIndex() = withContext(Dispatchers.IO + tracer.asContextElement()) {
+        val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.handleBatchIndex")
+
         try {
             if (semaphore.tryAcquire() && (batchQueue.size >= batchQueueSize)) {
                 productRepository.bulkInsert(batchQueue).also {
@@ -55,39 +65,48 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
                 }
             }
         } catch (ex: Exception) {
-            semaphore.release().also { log.error("Scheduled handleBatchIndex error", ex) }
+            semaphore.release().also { log.error("Scheduled handleBatchIndex error", ex) }.also { span.error(ex) }
             throw ex
+        } finally {
+            span.end()
         }
     }
 
 
     @Scheduled(initialDelay = 15000, fixedRate = 25000)
-    private fun flushBulkInsert() = runBlocking(errorhandler) {
+    fun flushBulkInsert() = runBlocking(errorhandler + tracer.asContextElement()) {
         withContext(Dispatchers.IO) {
+            val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBulkInsert")
+
             try {
                 if (semaphore.tryAcquire() && batchQueue.isNotEmpty()) {
                     productRepository.bulkInsert(batchQueue).also {
                         batchQueue.clear()
-                        semaphore.release()
+                        semaphore.release().also { span.tag("bulkInsert count", batchQueue.size.toString()) }
                     }
                 }
             } catch (ex: Exception) {
-                semaphore.release().also { log.error("Scheduled flushBulkInsert error", ex) }
+                semaphore.release().also { log.error("Scheduled flushBulkInsert error", ex) }.also { span.error(ex) }
                 throw ex
+            } finally {
+                span.end()
             }
         }
     }
 
     @PreDestroy
-    fun flushBatchQueue() = runBlocking {
+    fun flushBatchQueue() = runBlocking(tracer.asContextElement()) {
+        val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBatchQueue")
+
         try {
             if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
-                batchQueue.clear()
-                log.info("batch queue saved")
+                batchQueue.clear().also { log.info("batch queue saved") }
             }
         } catch (ex: Exception) {
-            log.error("flushBatchQueue", ex)
+            log.error("flushBatchQueue", ex).also { span.error(ex) }
             throw ex
+        } finally {
+            span.end()
         }
     }
 
