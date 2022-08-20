@@ -1,15 +1,19 @@
 package com.search.microservice.repository
 
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
+import co.elastic.clients.elasticsearch.core.BulkRequest
 import co.elastic.clients.json.JsonData
 import com.search.microservice.domain.Product
 import com.search.microservice.utils.KeyboardLayoutManager
 import com.search.microservice.utils.PaginationResponse
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import reactor.util.Loggers
+import java.util.concurrent.BlockingDeque
 import java.util.concurrent.LinkedBlockingDeque
 
 
@@ -64,6 +68,31 @@ class ProductElasticRepositoryImpl(
             PaginationResponse.of(page, size, totalHits, productList).also { log.info("search result: $it") }
         } catch (ex: Exception) {
             log.error("search error", ex)
+            throw ex
+        }
+    }
+
+    override suspend fun bulkInsert(products: BlockingDeque<Product>) = withContext(Dispatchers.IO) {
+        try {
+            val br = BulkRequest.Builder()
+
+            if (products.isNotEmpty()) {
+                products.forEach { product ->
+                    br.operations {
+                        it.index<Product> { indexOpsBuilder ->
+                            indexOpsBuilder.document(product).id(product.id)
+                        }
+                    }
+                }
+
+                br.index(productIndexName)
+                val bulkRequest = br.build()
+                val response = esClient.bulk(bulkRequest).await()
+
+                log.info("bulk insert response: $response")
+            }
+        } catch (ex: Exception) {
+            log.error("bulkInsert", ex)
             throw ex
         }
     }

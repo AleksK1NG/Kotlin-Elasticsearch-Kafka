@@ -1,14 +1,12 @@
 package com.search.microservice.consumer
 
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
-import co.elastic.clients.elasticsearch.core.BulkRequest
-import co.elastic.clients.elasticsearch.core.bulk.IndexOperation
 import com.search.microservice.domain.Product
 import com.search.microservice.exceptions.SerializationException
+import com.search.microservice.repository.ProductElasticRepository
 import com.search.microservice.utils.SerializationUtils.deserializeFromJsonBytes
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.springframework.kafka.annotation.KafkaListener
@@ -22,7 +20,10 @@ import java.util.concurrent.Semaphore
 
 
 @Service
-class ProductKafkaConsumer(private val esClient: ElasticsearchAsyncClient) {
+class ProductKafkaConsumer(
+    private val esClient: ElasticsearchAsyncClient,
+    private val productRepository: ProductElasticRepository
+    ) {
     private val batchQueue = LinkedBlockingDeque<Product>(5000)
     private val semaphore = Semaphore(1)
 
@@ -48,19 +49,7 @@ class ProductKafkaConsumer(private val esClient: ElasticsearchAsyncClient) {
         try {
             semaphore.acquire()
             log.info("batch insert semaphore acquired: ${Thread.currentThread().name}")
-            if (batchQueue.size >= 100) {
-                val br = BulkRequest.Builder()
-                batchQueue.forEach {
-                    br.operations { op ->
-                        op.index { idx: IndexOperation.Builder<Product> ->
-                            idx.index("products").id(it.id).document(it)
-                        }
-                    }
-                }
-                val response = esClient.bulk(br.build()).await()
-                log.info("bulk insert: ${batchQueue.size}, response: $response, thread: ${Thread.currentThread().name}")
-                batchQueue.clear()
-            }
+            if (batchQueue.size >= 100) productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
             semaphore.release()
             log.info("batch insert semaphore released: ${Thread.currentThread().name}")
         } catch (ex: Exception) {
@@ -75,28 +64,10 @@ class ProductKafkaConsumer(private val esClient: ElasticsearchAsyncClient) {
         withContext(Dispatchers.IO) {
             try {
                 semaphore.acquire()
-                val br = BulkRequest.Builder()
-
-                if (batchQueue.isNotEmpty()) {
-                    batchQueue.forEach { product ->
-                        br.operations { it.index <Product>{
-                                indexOpsBuilder -> indexOpsBuilder.document(product).id(product.id)
-                        } }
-                    }
-
-                    br.index("products")
-                    val bulkRequest = br.build()
-                    log.info("bulkRequest: ${bulkRequest.toString()}")
-                    val response = esClient.bulk(bulkRequest).await()
-
-                    log.info("Scheduled bulk insert: ${batchQueue.size}, response: $response")
-
-                    batchQueue.clear()
-                }
-
+                if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also { batchQueue.clear() }
                 semaphore.release()
             } catch (ex: Exception) {
-                log.error("flushBulkInsert", ex)
+                log.error("Scheduled flushBulkInsert error", ex)
                 semaphore.release()
             }
         }
