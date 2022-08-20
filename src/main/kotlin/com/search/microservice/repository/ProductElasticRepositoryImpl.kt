@@ -10,6 +10,7 @@ import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Repository
 import reactor.util.Loggers
+import java.util.concurrent.LinkedBlockingDeque
 
 
 @Repository
@@ -31,6 +32,7 @@ class ProductElasticRepositoryImpl(
     }
 
     override suspend fun search(term: String, page: Int, size: Int): PaginationResponse<Product> = withTimeout(65000) {
+        LinkedBlockingDeque<Any>(100)
         try {
             val response = esClient.search({
                 it.index(productIndexName)

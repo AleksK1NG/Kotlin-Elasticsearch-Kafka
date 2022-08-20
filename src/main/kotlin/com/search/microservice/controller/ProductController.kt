@@ -19,6 +19,7 @@ class ProductController(private val productService: ProductService) {
         productService.index(product).let { ResponseEntity.ok(product).also { log.info("indexed product: $product") } }
     }
 
+
     @GetMapping("/search")
     suspend fun search(
         @RequestParam(name = "term") term: String,
