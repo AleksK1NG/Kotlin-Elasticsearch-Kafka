@@ -7,6 +7,7 @@ import kotlinx.coroutines.withTimeout
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.util.Loggers
+import javax.validation.Valid
 
 
 @RestController
@@ -14,7 +15,7 @@ import reactor.util.Loggers
 class ProductController(private val productService: ProductService) {
 
     @PostMapping
-    suspend fun indexAsync(@RequestBody request: IndexProductRequest): ResponseEntity<*> = withTimeout(timeoutMillis) {
+    suspend fun indexAsync(@Valid @RequestBody request: IndexProductRequest): ResponseEntity<*> = withTimeout(timeoutMillis) {
         val product = Product.of(request)
         productService.index(product).let { ResponseEntity.ok(product).also { log.info("indexed product: $product") } }
     }
