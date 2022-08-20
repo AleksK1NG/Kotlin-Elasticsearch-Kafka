@@ -22,7 +22,7 @@ class ProductController(private val productService: ProductService) {
 
     @GetMapping("/search")
     suspend fun search(
-        @RequestParam(name = "term") term: String,
+        @RequestParam(name = "search") term: String,
         @RequestParam(name = "page", required = false, defaultValue = "0") page: Int,
         @RequestParam(name = "size", required = false, defaultValue = "10") size: Int,
     ) = withTimeout(timeoutMillis) {
