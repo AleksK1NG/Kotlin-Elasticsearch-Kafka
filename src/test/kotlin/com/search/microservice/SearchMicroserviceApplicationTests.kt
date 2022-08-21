@@ -45,7 +45,7 @@ class SearchMicroserviceApplicationTests(
     fun indexProducts(): Unit = runBlocking {
         var requests = 0
         var errors = 0
-        repeat(10000) {
+        repeat(2000) {
             val request = IndexProductRequest(
                 title = faker.food().fruit(),
                 description = faker.lorem().fixedString(60),
