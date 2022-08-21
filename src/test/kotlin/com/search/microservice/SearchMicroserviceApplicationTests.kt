@@ -43,7 +43,9 @@ class SearchMicroserviceApplicationTests(
 
     @Test
     fun indexProducts(): Unit = runBlocking {
-        repeat(1000) {
+        var requests = 0
+        var errors = 0
+        repeat(10000) {
             val request = IndexProductRequest(
                 title = faker.food().fruit(),
                 description = faker.lorem().fixedString(60),
@@ -59,12 +61,21 @@ class SearchMicroserviceApplicationTests(
                     .uri("http://localhost:8000/api/v1/products")
                     .contentType(APPLICATION_JSON)
                     .body(BodyInserters.fromValue(mapper.writeValueAsString(request)))
-                    .awaitExchange { log.info("response: ${it.rawStatusCode()}") }
+                    .awaitExchange {
+                        if (it.rawStatusCode() >= 300 || it.rawStatusCode() < 200) {
+                            log.info("ERROR REQUEST >>>>>>>>>>>>>>: $it")
+                            errors++
+                        } else {
+                            requests++
+                        }
+                    }
 
             } catch (ex: Exception) {
                 log.error("indexProducts", ex)
             }
         }
+
+        log.info("REQUESTS STATUS: \n\n\n\n requests: $requests, errors: $errors")
     }
 
     companion object {
