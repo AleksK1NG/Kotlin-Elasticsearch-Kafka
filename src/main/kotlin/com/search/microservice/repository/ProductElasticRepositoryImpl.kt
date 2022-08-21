@@ -64,9 +64,7 @@ class ProductElasticRepositoryImpl(
                                     m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields("title", "description", "shop")
                                 }
                             }.mustNot { s ->
-                                s.range { r ->
-                                    r.field("count_in_stock").lt(JsonData.of(0))
-                                }
+                                s.range { r -> r.field("count_in_stock").lt(JsonData.of(0)) }
                             }
                         }
                     }
