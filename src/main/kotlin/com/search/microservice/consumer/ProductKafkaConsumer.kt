@@ -38,7 +38,10 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
                 try {
                     val product = SerializationUtils.deserializeFromJsonBytes(data, Product::class.java)
                     handleBatchIndex(product)
-                    ack.acknowledge().also { span.tag("message", product.toString()) }
+                    ack.acknowledge().also {
+                        span.tag("message", product.toString())
+                        log.info("<<<commit>>> process index for productID: ${product.id}")
+                    }
                 } catch (ex: SerializationException) {
                     ack.acknowledge().also { log.error("<<<commit error>>> serialization error", ex) }.also { span.error(ex) }
                 } catch (ex: Exception) {
@@ -54,16 +57,14 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.handleBatchIndex")
 
         try {
-            mutex.lock().also { log.info("(HANDLE BATCH INDEX) lock enabled batch insert LOCK released >>>>>>>>>>>>>>>>>>>>> ${Thread.currentThread().name} ") }
+            mutex.lock()
             batchQueue.add(product)
             if (batchQueue.size >= batchQueueSize) productRepository.bulkInsert(batchQueue).also {
-                log.info("HANDLE BATCH INDEX queueSize: >>>>>>>>>>>>>> ${batchQueue.size} \n\n\n\n")
+                log.info("(handleBatchIndex) saved queueSize: >>>>>>>>>>>>>> ${batchQueue.size}")
                 batchQueue.clear()
             }
-        } catch (ex: Exception) {
-            throw ex
         } finally {
-            mutex.unlock().also { log.info("(HANDLE BATCH INDEX) LOCK released >>>>>>>>>>>>>>>>>>>>>: ${Thread.currentThread().name}") }
+            mutex.unlock()
             span.end()
         }
     }
@@ -72,19 +73,20 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     @Scheduled(initialDelay = 25000, fixedRate = 10000)
     fun flushBulkInsert() = runBlocking(errorhandler + tracer.asContextElement()) {
         withContext(Dispatchers.IO) {
-            log.info("(Scheduled) running scheduled insert >>>>>>>>>, ${batchQueue.size} \n")
+            log.info("(Scheduled) running scheduled insert queueSize: >>>>>>>>>, ${batchQueue.size} \n")
             val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBulkInsert")
 
             try {
-                mutex.lock().also { log.info("(Scheduled) lock enabled batch insert LOCK released >>>>>>>>>>>>>>>>>>>>> ${Thread.currentThread().name} ") }
+                mutex.lock()
                 if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
-                    log.info("(Scheduled) BATCH INDEX queueSize: >>>>>>>>>>>>>> ${batchQueue.size} \n\n\n\n")
+                    log.info("(Scheduled) saved queueSize: >>>>>>>>>>>>>> ${batchQueue.size} \n\n\n\n")
                     batchQueue.clear()
                 }
             } catch (ex: Exception) {
+                span.error(ex)
                 throw ex
             } finally {
-                mutex.unlock().also { log.info("(Scheduled) LOCK released >>>>>>>>>>>>>>>>>>>>>: ${Thread.currentThread().name}") }
+                mutex.unlock()
                 span.end()
             }
         }
@@ -95,6 +97,7 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBatchQueue")
 
         try {
+            mutex.lock()
             if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
                 batchQueue.clear().also { log.info("batch queue saved") }
             }
@@ -102,7 +105,7 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
             log.error("flushBatchQueue", ex).also { span.error(ex) }
             throw ex
         } finally {
-            span.end()
+            mutex.unlock().also { span.end() }
         }
     }
 
