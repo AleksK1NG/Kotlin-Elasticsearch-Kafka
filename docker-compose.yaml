@@ -1,0 +1,136 @@
+version: "3.9"
+
+services:
+  search-microservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: microservice
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    environment:
+      - SPRING_APPLICATION_NAME=microservice_docker
+      - SERVER_PORT=8000
+      - ELASTICSEARCH_HOST=host.docker.internal
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=host.docker.internal:9092
+      - SPRING_ZIPKIN_BASE_URL=http://host.docker.internal:9411
+    depends_on:
+      - zookeeper
+      - kafka
+      - zipkin
+      - prometheus
+      - grafana
+      - node01
+      - kibana
+      - node_exporter
+    networks: [ "microservices" ]
+
+  zookeeper:
+    image: 'bitnami/zookeeper:3.8.0'
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - "./zookeeper:/zookeeper"
+    networks: [ "microservices" ]
+
+  kafka:
+    image: 'bitnami/kafka:3.2.1'
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    volumes:
+      - "./kafka_data:/bitnami"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+    depends_on:
+      - zookeeper
+    networks: [ "microservices" ]
+
+  node01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+    container_name: node01
+    restart: always
+    environment:
+      - node.name=node01
+      - cluster.name=es-cluster-8
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.license.self_generated.type=basic
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./es-data01:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks: [ "microservices" ]
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.3.3
+    restart: always
+    environment:
+      ELASTICSEARCH_HOSTS: http://node01:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - node01
+    networks: [ "microservices" ]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [ "microservices" ]
+
+  node_exporter:
+    container_name: node_exporter_container
+    restart: always
+    image: prom/node-exporter
+    ports:
+      - '9101:9100'
+    networks: [ "microservices" ]
+
+  grafana:
+    container_name: grafana_container
+    restart: always
+    image: grafana/grafana
+    ports:
+      - '3005:3000'
+    networks: [ "microservices" ]
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    restart: always
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks: [ "microservices" ]
+
+volumes:
+  es-data01:
+    driver: local
+
+networks:
+  microservices:
+    name: microservices

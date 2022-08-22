@@ -100,7 +100,7 @@ class ProductElasticRepositoryImpl(
 
                 esClient.bulk(br.build()).await().also {
                     span.tag("bulk insert response", it.toString())
-                    log.info("bulk insert response: $it")
+                    log.info("bulk insert response: ${it.took()}")
                 }
             }
         } catch (ex: Exception) {
