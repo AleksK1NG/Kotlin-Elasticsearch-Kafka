@@ -98,9 +98,8 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
 
         try {
             mutex.lock()
-            if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
-                batchQueue.clear().also { log.info("batch queue saved") }
-            }
+            if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue)
+                .also { batchQueue.clear().also { log.info("batch queue saved") } }
         } catch (ex: Exception) {
             log.error("flushBatchQueue", ex).also { span.error(ex) }
             throw ex

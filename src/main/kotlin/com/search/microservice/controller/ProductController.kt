@@ -32,6 +32,6 @@ class ProductController(private val productService: ProductService) {
 
     companion object {
         private val log = Loggers.getLogger(ProductController::class.java)
-        private const val timeoutMillis = 5555000L
+        private const val timeoutMillis = 5000L
     }
 }

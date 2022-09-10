@@ -58,18 +58,4 @@ object SerializationUtils {
             throw SerializationException("valueType: $valueType, data: ${String(data)}", ex)
         }
     }
-
-//    fun writeTraceSpanAsMetadata(span: Span): ByteArray {
-//        val parentId = span.context().parentId() ?: ""
-//        val spanId = span.context().spanId() ?: ""
-//        val traceId = span.context().traceId() ?: ""
-//        val sampled = span.context().sampled() ?: false
-//        val traceMeta = mutableMapOf<String, Any>(
-//            Pair("parentId", parentId),
-//            Pair("spanId", spanId),
-//            Pair("traceId", traceId),
-//            Pair("sampled", sampled),
-//        )
-//        return writeValueAsBytes(traceMeta)
-//    }
 }

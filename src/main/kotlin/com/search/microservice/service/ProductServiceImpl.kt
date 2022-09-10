@@ -20,6 +20,7 @@ class ProductServiceImpl(
     private val tracer: Tracer
 ) : ProductService {
 
+
     override suspend fun index(product: Product) = withContext(tracer.asContextElement()) {
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductService.index")
         try {

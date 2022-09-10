@@ -18,11 +18,7 @@ import org.springframework.web.reactive.function.client.awaitExchange
 import reactor.util.Loggers
 import java.util.*
 
-//@SpringBootTest
-class SearchMicroserviceApplicationTests(
-//    @Autowired private val webClient: WebClient,
-//    @Autowired private val faker: Faker,
-) {
+class SearchMicroserviceApplicationTests {
 
     private val webClient: WebClient = WebClient.builder().build()
     private val faker = Faker(Locale("en"))
@@ -45,6 +41,7 @@ class SearchMicroserviceApplicationTests(
     fun indexProducts(): Unit = runBlocking {
         var requests = 0
         var errors = 0
+
         repeat(2000) {
             val request = IndexProductRequest(
                 title = faker.food().fruit(),
@@ -63,13 +60,12 @@ class SearchMicroserviceApplicationTests(
                     .body(BodyInserters.fromValue(mapper.writeValueAsString(request)))
                     .awaitExchange {
                         if (it.rawStatusCode() >= 300 || it.rawStatusCode() < 200) {
-                            log.info("ERROR REQUEST >>>>>>>>>>>>>>: $it")
+                            log.info("error request >>>>>>>>>>>>>>: $it")
                             errors++
                         } else {
                             requests++
                         }
                     }
-
             } catch (ex: Exception) {
                 log.error("indexProducts", ex)
             }
