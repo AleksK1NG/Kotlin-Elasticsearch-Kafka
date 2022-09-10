@@ -3,7 +3,6 @@ package com.search.microservice.configuration
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.elasticsearch.indices.ExistsRequest
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest
-import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Value
@@ -14,10 +13,7 @@ import reactor.util.Loggers
 
 
 @Configuration
-class ElasticSearchIndexConfig(
-    private val esClient: ElasticsearchAsyncClient,
-    private val objectMapper: ObjectMapper,
-) : CommandLineRunner {
+class ElasticSearchIndexConfig(private val esClient: ElasticsearchAsyncClient) : CommandLineRunner {
 
     @Value(value = "\${elasticsearch.mappings-path:classpath:mappings.json}")
     val productsMappingsResourceFile: Resource? = null
@@ -44,8 +40,6 @@ class ElasticSearchIndexConfig(
             if (!exists.value()) {
                 esClient.indices().create { it.index(productIndexName).withJson(productsMappingsResourceFile?.inputStream) }.await()
                     .also { log.info("index created: ${it.index()}") }
-
-//                if (enable) generateMockData()
                 return@runBlocking
             }
 
@@ -54,10 +48,6 @@ class ElasticSearchIndexConfig(
         } catch (ex: Exception) {
             log.error("error while loading mappings file: ${ex.message}", ex)
         }
-
-    }
-
-    public fun getOppositeLayoutSearchTerm(originalTerm: String) {
 
     }
 

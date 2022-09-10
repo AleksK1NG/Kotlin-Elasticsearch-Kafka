@@ -20,6 +20,7 @@ class KafkaTopicConfiguration(
     fun kafkaAdmin(): KafkaAdmin {
         val configs: MutableMap<String, Any> = HashMap()
         configs[AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
+        log.info("kafka servers >>>>>>>>>>> : $bootstrapServers")
         return KafkaAdmin(configs)
     }
 
@@ -27,8 +28,7 @@ class KafkaTopicConfiguration(
     fun indexProductTopicInitializer(kafkaAdmin: KafkaAdmin): NewTopic? {
         return try {
             val topic = NewTopic(indexProductTopicName, partitionsCount, replicationFactor.toShort())
-            kafkaAdmin.createOrModifyTopics(topic)
-            log.info("(indexProductTopicInitializer) topic: $topic")
+            kafkaAdmin.createOrModifyTopics(topic).also { log.info("(indexProductTopicInitializer) topic: $topic") }
             topic
         } catch (ex: Exception) {
             log.error("indexProductTopicInitializer", ex)

@@ -32,7 +32,7 @@ class ElasticSearchHealthCheck(
             if (isAvailable) {
                 AvailabilityChangeEvent.publish(applicationContext, LivenessState.CORRECT)
                 AvailabilityChangeEvent.publish(applicationContext, ReadinessState.ACCEPTING_TRAFFIC)
-                log.info("(ElasticSearchHealthCheck) status livenessState: ${availability.livenessState}, readinessState: ${availability.readinessState}")
+                log.debug("(ElasticSearchHealthCheck) status livenessState: ${availability.livenessState}, readinessState: ${availability.readinessState}")
             }
         } catch (ex: Exception) {
             AvailabilityChangeEvent.publish(applicationContext, LivenessState.BROKEN)

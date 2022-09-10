@@ -14,7 +14,7 @@ class ElasticHealthCheck(private val esClient: ElasticsearchAsyncClient) : Abstr
     override fun doHealthCheck(builder: Health.Builder): Unit = runBlocking {
         try {
             if (esClient.ping().await().value()) {
-                builder.up().also { log.info("(doHealthCheck) status up") }
+                builder.up().also { log.debug("(doHealthCheck) status up") }
             } else {
                 builder.down()
             }

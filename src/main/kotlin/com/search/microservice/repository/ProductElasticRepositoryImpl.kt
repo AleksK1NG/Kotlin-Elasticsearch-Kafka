@@ -2,6 +2,7 @@ package com.search.microservice.repository
 
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.elasticsearch.core.BulkRequest
+import co.elastic.clients.elasticsearch.core.SearchResponse
 import co.elastic.clients.json.JsonData
 import com.search.microservice.domain.Product
 import com.search.microservice.utils.KeyboardLayoutManager
@@ -49,31 +50,31 @@ class ProductElasticRepositoryImpl(
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.search")
 
         try {
-            esClient.search({
-                it.index(productIndexName)
-                    .size(size)
-                    .from((page * size))
-                    .query { q ->
-                        q.bool { b ->
-                            b.should { s ->
-                                s.multiMatch { m ->
-                                    m.query(term).fields("title", "description", "shop")
+            esClient.search(
+                {
+                    it.index(productIndexName)
+                        .size(size)
+                        .from((page * size))
+                        .query { q ->
+                            q.bool { b ->
+                                b.should { s ->
+                                    s.multiMatch { m ->
+                                        m.query(term).fields("title", "description", "shop")
+                                    }
+                                }.should { s ->
+                                    s.multiMatch { m ->
+                                        m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields("title", "description", "shop")
+                                    }
+                                }.mustNot { s ->
+                                    s.range { r -> r.field("count_in_stock").lt(JsonData.of(0)) }
                                 }
-                            }.should { s ->
-                                s.multiMatch { m ->
-                                    m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields("title", "description", "shop")
-                                }
-                            }.mustNot { s ->
-                                s.range { r -> r.field("count_in_stock").lt(JsonData.of(0)) }
                             }
                         }
-                    }
-            }, Product::class.java)
+                }, Product::class.java
+            )
                 .await()
                 .let {
-                    val productList = it.hits().hits().mapNotNull { hit -> hit.source() }
-                    val totalHits = it.hits().total()?.value() ?: 0
-                    PaginationResponse.of(page, size, totalHits, productList)
+                    buildSearchPaginatedResponse(it, page, size)
                         .also { response -> log.info("search result: $response") }
                         .also { response -> span.tag("search result", response.toString()) }
                 }
@@ -83,6 +84,12 @@ class ProductElasticRepositoryImpl(
         } finally {
             span.end()
         }
+    }
+
+    private fun buildSearchPaginatedResponse(searchResponse: SearchResponse<Product>, page: Int, size: Int): PaginationResponse<Product> {
+        val productList = searchResponse.hits().hits().mapNotNull { hit -> hit.source() }
+        val totalHits = searchResponse.hits().total()?.value() ?: 0
+        return PaginationResponse.of(page, size, totalHits, productList)
     }
 
     override suspend fun bulkInsert(products: BlockingDeque<Product>) = withContext(Dispatchers.IO + tracer.asContextElement()) {
