@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   search-microservice:
+#    platform: linux/arm64/v8
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,7 +30,7 @@ services:
     networks: [ "microservices" ]
 
   zookeeper:
-    image: 'bitnami/zookeeper:3.8.0'
+    image: 'bitnami/zookeeper:latest'
     ports:
       - '2181:2181'
     environment:
@@ -39,7 +40,7 @@ services:
     networks: [ "microservices" ]
 
   kafka:
-    image: 'bitnami/kafka:3.2.1'
+    image: 'bitnami/kafka:latest'
     ports:
       - "9092:9092"
       - "9093:9093"
