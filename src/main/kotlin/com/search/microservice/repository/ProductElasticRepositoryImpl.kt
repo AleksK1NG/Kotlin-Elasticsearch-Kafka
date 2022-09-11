@@ -29,15 +29,15 @@ class ProductElasticRepositoryImpl(
     private val tracer: Tracer
 ) : ProductElasticRepository {
 
-    @Value(value = "\${elasticsearch.mappings-index-name}")
-    lateinit var productIndexName: String
+    @Value(value = "\${elasticsearch.mappings-index-alias-name}")
+    lateinit var productIndexAliasName: String
 
 
     override suspend fun index(product: Product): Unit = withContext(Dispatchers.IO + tracer.asContextElement()) {
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.index")
 
         try {
-            esClient.index<Product> { it.index(productIndexName).id(product.id).document(product) }
+            esClient.index<Product> { it.index(productIndexAliasName).id(product.id).document(product) }
                 .await()
                 .also {
                     span.tag("response", it.toString())
@@ -57,7 +57,7 @@ class ProductElasticRepositoryImpl(
         try {
             esClient.search(
                 {
-                    it.index(productIndexName)
+                    it.index(productIndexAliasName)
                         .size(size)
                         .from((page * size))
                         .query { q ->
@@ -102,7 +102,7 @@ class ProductElasticRepositoryImpl(
 
         try {
             if (products.isNotEmpty()) {
-                val br = BulkRequest.Builder().index(productIndexName)
+                val br = BulkRequest.Builder().index(productIndexAliasName)
 
                 products.forEach { product ->
                     br.operations {
