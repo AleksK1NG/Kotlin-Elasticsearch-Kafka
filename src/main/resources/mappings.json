@@ -19,7 +19,7 @@
           "min_gram": 1,
           "max_gram": 20
         },
-        "name_synonym_filter" : {
+        "name_synonym_filter": {
           "type": "synonym",
           "synonyms": [
             "Water, water, вода, Вода, Цфеук, цфеук, Djlf, djlf",
@@ -40,12 +40,12 @@
       "title": {
         "type": "text",
         "analyzer": "autocomplete_analyzer",
-        "search_analyzer" : "standard"
+        "search_analyzer": "standard"
       },
       "description": {
         "type": "text",
         "analyzer": "autocomplete_analyzer",
-        "search_analyzer" : "standard"
+        "search_analyzer": "standard"
       },
       "image_url": {
         "type": "keyword"
@@ -56,10 +56,13 @@
       "shop": {
         "type": "text",
         "analyzer": "autocomplete_analyzer",
-        "search_analyzer" : "standard"
+        "search_analyzer": "standard"
       },
       "created_at": {
         "type": "date"
+      },
+      "id": {
+        "type": "keyword"
       }
     }
   }

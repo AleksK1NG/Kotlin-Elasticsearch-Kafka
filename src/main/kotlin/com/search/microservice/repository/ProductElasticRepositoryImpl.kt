@@ -4,6 +4,10 @@ import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient
 import co.elastic.clients.elasticsearch.core.BulkRequest
 import co.elastic.clients.elasticsearch.core.SearchResponse
 import co.elastic.clients.json.JsonData
+import com.search.microservice.constants.ProductSearchConstants.COUNT_IN_STOCK
+import com.search.microservice.constants.ProductSearchConstants.DESCRIPTION
+import com.search.microservice.constants.ProductSearchConstants.SHOP
+import com.search.microservice.constants.ProductSearchConstants.TITLE
 import com.search.microservice.domain.Product
 import com.search.microservice.utils.KeyboardLayoutManager
 import com.search.microservice.utils.PaginationResponse
@@ -27,6 +31,7 @@ class ProductElasticRepositoryImpl(
 
     @Value(value = "\${elasticsearch.mappings-index-name}")
     lateinit var productIndexName: String
+
 
     override suspend fun index(product: Product): Unit = withContext(Dispatchers.IO + tracer.asContextElement()) {
         val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductElasticRepository.index")
@@ -59,14 +64,14 @@ class ProductElasticRepositoryImpl(
                             q.bool { b ->
                                 b.should { s ->
                                     s.multiMatch { m ->
-                                        m.query(term).fields("title", "description", "shop")
+                                        m.query(term).fields(TITLE, DESCRIPTION, SHOP)
                                     }
                                 }.should { s ->
                                     s.multiMatch { m ->
-                                        m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields("title", "description", "shop")
+                                        m.query(keyboardLayoutManager.getOppositeKeyboardLayoutTerm(term)).fields(TITLE, DESCRIPTION, SHOP)
                                     }
                                 }.mustNot { s ->
-                                    s.range { r -> r.field("count_in_stock").lt(JsonData.of(0)) }
+                                    s.range { r -> r.field(COUNT_IN_STOCK).lt(JsonData.of(0)) }
                                 }
                             }
                         }

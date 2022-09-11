@@ -73,13 +73,13 @@ class ProductKafkaConsumer(private val productRepository: ProductElasticReposito
     @Scheduled(initialDelay = 25000, fixedRate = 10000)
     fun flushBulkInsert() = runBlocking(errorhandler + tracer.asContextElement()) {
         withContext(Dispatchers.IO) {
-            log.info("(Scheduled) running scheduled insert queueSize: >>>>>>>>>, ${batchQueue.size} \n")
+            log.info("(Scheduled) running scheduled insert queueSize: ${batchQueue.size} \n")
             val span = tracer.nextSpan(tracer.currentSpan()).start().name("ProductKafkaConsumer.flushBulkInsert")
 
             try {
                 mutex.lock()
                 if (batchQueue.isNotEmpty()) productRepository.bulkInsert(batchQueue).also {
-                    log.info("(Scheduled) saved queueSize: >>>>>>>>>>>>>> ${batchQueue.size} \n\n\n\n")
+                    log.info("(Scheduled) saved queueSize: ${batchQueue.size} \n\n\n\n")
                     batchQueue.clear()
                 }
             } catch (ex: Exception) {
