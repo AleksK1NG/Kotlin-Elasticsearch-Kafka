@@ -76,8 +76,7 @@ class ProductElasticRepositoryImpl(
                             }
                         }
                 }, Product::class.java
-            )
-                .await()
+            ).await()
                 .let {
                     buildSearchPaginatedResponse(it, page, size)
                         .also { response -> log.info("search result: $response") }
