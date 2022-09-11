@@ -1,4 +1,4 @@
-Kotlin ElasticSearch and Kafka full-text search microservice 👋✨💫
+Kotlin Spring, ElasticSearch and Kafka full-text search microservice 👋✨💫
 
 #### 👨‍💻 Full list what has been used:
 [Spring](https://spring.io/) Spring web framework <br/>
